@@ -10,7 +10,7 @@ const exerciseServices = {
     },
 
     getAll: async () => {
-        return await exerciseModel.find();
+        return await exerciseModel.find().sort({ createdAt: -1 });
     },
 
     getById: async (id) => {

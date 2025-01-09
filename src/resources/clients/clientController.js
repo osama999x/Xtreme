@@ -103,7 +103,7 @@ const clientController = {
 
         let googleData = null;
 
-        if (googleToken) {
+        if (req.body.googleToken) {
             try {
                 googleData = await googleAuthService.verifyGoogleToken(req.body.googleToken);
             } catch (err) {
@@ -158,12 +158,11 @@ const clientController = {
             );
         }
 
-        // Hash password only if it's not null
         if (req.body.password) {
             req.body.password = await passwordServices.hash(req.body.password, 12);
         }
 
-        if (req.body.profilePicture && !googleToken) {
+        if (req.body.profilePicture && !req.body.googleToken) {
             req.body.profilePicture = await uploadFile(req.body.profilePicture);
         }
 

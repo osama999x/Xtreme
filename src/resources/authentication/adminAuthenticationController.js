@@ -123,6 +123,8 @@ const adminAuthenticationController = {
                         clientUser.lastLogin = Date.now();
                         await clientUser.save();
                     }
+                    clientUser.lastLogin = Date.now();
+                    await clientUser.save();
                     const accessToken = jwtServices.create({ clientId: clientUser._id });
                     const data = { clientUser, accessToken };
                     return await sendResponse(res, OK, 'Client Logged In via Google', data, req.logId);

@@ -9,7 +9,6 @@ const clientValidator = {
             then: Joi.optional(),
             otherwise: Joi.required(),
         }),
-        googleToken: Joi.string().optional(),
         gender: Joi.string().valid('Male', 'Female', 'Other').optional(),
         isActive: Joi.boolean().optional(),
         address: Joi.string().optional().allow(""),
