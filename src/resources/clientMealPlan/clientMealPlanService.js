@@ -276,6 +276,49 @@ class ClientMealPlanService {
     async deleteMealPlan(id) {
         return await ClientMealPlan.findByIdAndDelete(id);
     }
+
+    async updateMealPlanStatus(clientId, date, status) {
+
+
+        try {
+            console.log('clientId', clientId)
+            console.log('date', date)
+            console.log('status', status)
+            const mealPlan = await ClientMealPlan.findOne({
+                clientId,
+                date: new Date(date),
+            });
+
+            if (!mealPlan) {
+                console.log('Meal plan not found for the given date and clientId.');
+                return null;
+            }
+
+            mealPlan.status = status;
+            await mealPlan.save();
+
+            const client = await Client.findById(clientId);
+            if (client) {
+                const mealPlansInRange = await ClientMealPlan.find({ clientId });
+                const allCompleted = mealPlansInRange.every(plan => plan.status && plan.status === 'Not Completed' && plan.status === 'Completed');
+
+                if (allCompleted) {
+                    client.mealPlanStatus = 'Not Requested';
+                    client.mealPlanStatusStartDate = null;
+                    client.mealPlanStatusEndDate = null;
+                } else {
+                    client.mealPlanStatus = 'Assigned';
+                }
+
+                await client.save();
+            }
+
+            return mealPlan;
+        } catch (error) {
+            console.error('Error updating meal plan status:', error);
+            throw new Error('Internal server error');
+        }
+    }
 }
 
 module.exports = new ClientMealPlanService();

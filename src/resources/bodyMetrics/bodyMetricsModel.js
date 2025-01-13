@@ -24,6 +24,13 @@ const bodyMetricsSchema = new Schema(
             type: Number,
 
         },
+        thigh: {
+            type: Number,
+
+        }, arm: {
+            type: Number,
+
+        },
         weightLoss: {
             type: Number,
 
@@ -36,6 +43,9 @@ const bodyMetricsSchema = new Schema(
             type: Number,
 
         },
+        chest: {
+            type: Number,
+        }
     },
     { timestamps: true }
 );

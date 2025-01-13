@@ -47,6 +47,9 @@ const dailyWellnessSchema = new Schema(
         glasses: {
             type: String,
         },
+        heartRate: {
+            type: String,
+        },
 
     },
     { timestamps: true }

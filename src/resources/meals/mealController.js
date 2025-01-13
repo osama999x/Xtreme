@@ -25,17 +25,24 @@ const mealController = {
     }),
 
     updateMealAndRecipes: asyncHandler(async (req, res) => {
+
         const { error } = mealValidator.updateMealValidator.validate(req.body);
         if (error) {
             return sendResponse(res, responseStatusCodes.BAD, error.details[0].message);
         }
 
-        const { mealName, mealType, recipeIds } = req.body;
+        const { mealName, mealType, recipeIds, recipes } = req.body;
         const { mealId } = req.params;
 
-        const updatedMeal = await mealServices.updateMealAndRecipes(mealId, { mealName, mealType }, recipeIds);
-        return sendResponse(res, responseStatusCodes.OK, 'Meal updated successfully', updatedMeal);
+        try {
+            const updatedMeal = await mealServices.updateMealAndRecipes(mealId, { mealName, mealType }, recipeIds, recipes);
+
+            return sendResponse(res, responseStatusCodes.OK, 'Meal and recipes updated successfully', updatedMeal);
+        } catch (err) {
+            return sendResponse(res, responseStatusCodes.SERVER, err.message);
+        }
     }),
+
 
     createMealWithPreExistingRecipes: asyncHandler(async (req, res) => {
         const { error } = mealValidator.createMealWithRecipeIdsValidator.validate(req.body);

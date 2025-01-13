@@ -95,7 +95,6 @@ class MessageService {
                 }
             ]);
 
-            // console.log("messages", messages);
 
             return messages;
         } catch (error) {

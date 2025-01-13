@@ -46,6 +46,7 @@ const clientProgressImagesRouter = require('./src/resources/clientProgressImages
 const clientNotes = require('./src/resources/clientNotes/clientNoteRouter');
 const dailyWellnessRouter = require('./src/resources/dailyWellness/dailyWellnessRouter');
 const ChatGPT = require('./src/utils/gpt');
+const calendlyRouter = require('./src/resources/oAuthCalendly/oAuthRouter');
 // Database connection
 require('./src/config/db');
 
@@ -53,7 +54,7 @@ require('./src/config/db');
 app.use(cors());
 app.use(logger('dev'));
 app.use(loggingMiddleware);
-app.use(express.json({ limit: '16mb' }));
+app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -92,6 +93,8 @@ app.use(`/api/${version}/checkIn`, checkInRouter);
 app.use(`/api/${version}/clientProgressImages`, clientProgressImagesRouter);
 app.use(`/api/${version}/clientNotes`, clientNotes);
 app.use(`/api/${version}/dailyWellness`, dailyWellnessRouter);
+app.use(`/api/${version}/calendly`, calendlyRouter);
+
 
 // Schedule cron jobs
 cron.schedule("0 0 * * 0", () => {
@@ -104,6 +107,10 @@ cron.schedule('0 0 * * *', () => {
     updateSubscriptionStatuses();
 });
 
+// cron.schedule('*/2 * * * *', () => {
+//     console.log('Updating subscription statuses...');
+//     updateSubscriptionStatuses();
+// });
 
 
 

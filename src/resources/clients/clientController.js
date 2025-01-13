@@ -20,7 +20,7 @@ const WorkoutPlan = require('../workout/workoutPlanModel');
 const ClientMealPlan = require('../clientMealPlan/clientMealPlanModel')
 const moment = require('moment');
 const nodemailer = require('nodemailer');
-
+const googleAuthService = require('../../utils/googleAuthService');
 
 const transporter = nodemailer.createTransport({
     host: process.env.MAILHOST,
@@ -36,7 +36,56 @@ const generateOTP = () => {
     return Math.floor(10000 + Math.random() * 90000).toString(); // 5-digit OTP
 };
 const clientController = {
+    // createClient: asyncHandler(async (req, res) => {
+    //     const validationResult = clientValidator.create.validate(req.body);
+    //     if (validationResult.error) {
+    //         return sendResponse(
+    //             res,
+    //             responseStatusCodes.BAD,
+    //             `Validation error on field '${validationResult.error.details[0].path[0]}': ${validationResult.error.details[0].message}`,
+    //             null,
+    //             req.logId
+    //         );
+    //     }
 
+    //     // console.log("email", req.body.email);
+    //     const dup = await clientModel.findOne({ email: req.body.email });
+    //     // console.log("dup", dup)
+    //     if (dup) {
+    //         return sendResponse(
+    //             res,
+    //             responseStatusCodes.BAD,
+    //             `Email already exists: ${req.body.email}`,
+    //             null,
+    //             req.logId
+    //         );
+    //     }
+    //     const existingAdminUser = await adminUserModel.findOne({ email: req.body.email });
+    //     if (existingAdminUser) {
+    //         return await sendResponse(
+    //             res,
+    //             responseStatusCodes.BAD,
+    //             'Email already exists in Admin Users',
+    //             null,
+    //             req.logId
+    //         );
+    //     }
+
+    //     req.body.password = await passwordServices.hash(req.body.password, 12);
+    //     if (req.body.profilePicture) {
+    //         req.body.profilePicture = await uploadFile(req.body.profilePicture)
+    //     }
+
+    //     const newClient = await clientServices.create(req.body);
+
+    //     return sendResponse(
+    //         res,
+    //         responseStatusCodes.CREATED,
+    //         'Client created successfully',
+    //         newClient,
+    //         req.logId
+    //     );
+    // })
 
 
     createClient: asyncHandler(async (req, res) => {
@@ -51,10 +100,44 @@ const clientController = {
             );
         }
 
-        // console.log("email", req.body.email);
-        const dup = await clientModel.findOne({ email: req.body.email });
-        // console.log("dup", dup)
-        if (dup) {
+
+        let googleData = null;
+
+        if (req.body.googleToken) {
+            try {
+                googleData = await googleAuthService.verifyGoogleToken(req.body.googleToken);
+            } catch (err) {
+                return sendResponse(
+                    res,
+                    responseStatusCodes.BAD,
+                    'Invalid Google Token',
+                    null,
+                    req.logId
+                );
+            }
+
+            // Check if user with the same Google ID exists
+            const existingGoogleUser = await clientModel.findOne({ googleId: googleData.googleId });
+            if (existingGoogleUser) {
+                return sendResponse(
+                    res,
+                    responseStatusCodes.BAD,
+                    'Google account already registered',
+                    null,
+                    req.logId
+                );
+            }
+
+            req.body.name = googleData.name;
+            req.body.email = googleData.email;
+            req.body.profilePicture = googleData.profilePicture;
+            req.body.googleId = googleData.googleId;
+            req.body.password = null; // Password not required for Google signup
+        }
+
+        // Check for duplicate emails
+        const existingClient = await clientModel.findOne({ email: req.body.email });
+        if (existingClient) {
             return sendResponse(
                 res,
                 responseStatusCodes.BAD,
@@ -63,9 +146,10 @@ const clientController = {
                 req.logId
             );
         }
+
         const existingAdminUser = await adminUserModel.findOne({ email: req.body.email });
         if (existingAdminUser) {
-            return await sendResponse(
+            return sendResponse(
                 res,
                 responseStatusCodes.BAD,
                 'Email already exists in Admin Users',
@@ -74,9 +158,12 @@ const clientController = {
             );
         }
 
-        req.body.password = await passwordServices.hash(req.body.password, 12);
-        if (req.body.profilePicture) {
-            req.body.profilePicture = await uploadFile(req.body.profilePicture)
+        if (req.body.password) {
+            req.body.password = await passwordServices.hash(req.body.password, 12);
+        }
+
+        if (req.body.profilePicture && !req.body.googleToken) {
+            req.body.profilePicture = await uploadFile(req.body.profilePicture);
         }
 
         const newClient = await clientServices.create(req.body);
@@ -90,10 +177,86 @@ const clientController = {
         );
     })
     ,
+    // requestPlan: asyncHandler(async (req, res) => {
+    //     const { clientId, planType, startDate, endDate } = req.body;
+
+
+    //     if (!['workout', 'meal'].includes(planType)) {
+    //         return sendResponse(
+    //             res,
+    //             responseStatusCodes.BAD,
+    //             'Invalid plan type. Must be "workout" or "meal".'
+    //         );
+    //     }
+
+    //     const client = await clientModel.findById(clientId);
+    //     if (!client) {
+    //         return sendResponse(
+    //             res,
+    //             responseStatusCodes.NOTFOUND,
+    //             'Client not found'
+    //         );
+    //     }
+
+    //     const updatedClient = await clientServices.requestPlan(clientId, planType);
+    //     if (!updatedClient) {
+    //         return sendResponse(
+    //             res,
+    //             responseStatusCodes.NOTFOUND,
+    //             'Client not found'
+    //         );
+    //     }
+
+    //     const admins = await adminUserModel.find();
+    //     const notificationPromises = admins.map(async (admin) => {
+    //         const notificationData = {
+    //             title: 'New Plan Request',
+    //             body: `${planType.charAt(0).toUpperCase() + planType.slice(1)} plan requested by a client.`,
+    //             message: `Client ${client.name} has requested a ${planType} plan.`,
+    //             clientId: clientId,
+    //             adminId: admin._id,
+    //         };
+
+
+    //         await notificationService.createNotification(notificationData);
+
+
+    //         const fcmToken = admin.fcmToken;
+    //         if (fcmToken) {
+    //             await systemNotification.systemNotification(
+    //                 notificationData.body,
+    //                 notificationData.title,
+    //                 fcmToken,
+    //                 { clientId, clientName: client.name, planType }
+    //             );
+    //         }
+    //     });
+
+
+    //     const clientFcmToken = client.fcmToken;
+    //     if (clientFcmToken) {
+    //         await systemNotification.systemNotification(
+    //             `Your request for a ${planType} plan has been submitted successfully.`,
+    //             'Plan Request Submitted',
+    //             clientFcmToken,
+    //             { clientId, planType }
+    //         );
+    //     }
+
+    //     // Execute all notification promises
+    //     await Promise.all(notificationPromises);
+
+    //     return sendResponse(
+    //         res,
+    //         responseStatusCodes.OK,
+    //         `${planType.charAt(0).toUpperCase() + planType.slice(1)} plan requested successfully`,
+    //         updatedClient
+    //     );
+    // })
     requestPlan: asyncHandler(async (req, res) => {
-        const { clientId, planType, startDate, endDate } = req.body;
+        const { clientId, planType } = req.body;
 
-
+        // Validate plan type
         if (!['workout', 'meal'].includes(planType)) {
             return sendResponse(
                 res,
@@ -102,6 +265,7 @@ const clientController = {
             );
         }
 
+        // Check if the client exists
         const client = await clientModel.findById(clientId);
         if (!client) {
             return sendResponse(
@@ -111,53 +275,15 @@ const clientController = {
             );
         }
 
-        const updatedClient = await clientServices.requestPlan(clientId, planType, startDate, endDate);
+        // Update the client's plan status and handle notifications
+        const updatedClient = await clientServices.requestPlan(clientId, planType);
         if (!updatedClient) {
             return sendResponse(
                 res,
                 responseStatusCodes.NOTFOUND,
-                'Client not found'
+                'Failed to update client plan status'
             );
         }
-
-        const admins = await adminUserModel.find();
-        const notificationPromises = admins.map(async (admin) => {
-            const notificationData = {
-                title: 'New Plan Request',
-                body: `${planType.charAt(0).toUpperCase() + planType.slice(1)} plan requested by a client.`,
-                message: `Client ${client.name} has requested a ${planType} plan.`,
-                clientId: clientId,
-                adminId: admin._id,
-            };
-
-
-            await notificationService.createNotification(notificationData);
-
-
-            const fcmToken = admin.fcmToken;
-            if (fcmToken) {
-                await systemNotification.systemNotification(
-                    notificationData.body,
-                    notificationData.title,
-                    fcmToken,
-                    { clientId, clientName: client.name, planType }
-                );
-            }
-        });
-
-
-        const clientFcmToken = client.fcmToken;
-        if (clientFcmToken) {
-            await systemNotification.systemNotification(
-                `Your request for a ${planType} plan has been submitted successfully.`,
-                'Plan Request Submitted',
-                clientFcmToken,
-                { clientId, planType }
-            );
-        }
-
-        // Execute all notification promises
-        await Promise.all(notificationPromises);
 
         return sendResponse(
             res,
@@ -329,9 +455,402 @@ const clientController = {
         );
     }),
 
+    // dashboard: asyncHandler(async (req, res) => {
+    //     const { id: clientId } = req.params;
+    //     const { frequency = 'weekly', measurement, date, dailyWellness } = req.query;
+
+    //     try {
+    //         const now = moment();
+    //         let bodyMetricsData;
+    //         let dailyWellnessData;
+
+    //         const validMeasurements = ['weight', 'waist', 'hips', 'bodyFat', 'thigh', 'arm'];
+    //         if (!validMeasurements.includes(measurement)) {
+    //             return sendResponse(res, responseStatusCodes.BAD, 'Invalid measurement type provided.');
+    //         }
+
+    //         // Body Metrics Data
+    //         if (frequency === 'daily') {
+    //             const dailyData = [];
+    //             for (let i = 0; i < 5; i++) {
+    //                 const targetDate = now.subtract(i, 'days').startOf('day').toDate();
+    //                 const nextDay = moment(targetDate).endOf('day').toDate();
+
+    //                 const dailyMetric = await BodyMetrics.findOne({
+    //                     clientId,
+    //                     createdAt: { $gte: targetDate, $lte: nextDay },
+    //                 });
+
+    //                 const value = dailyMetric ? dailyMetric[measurement] : 0;
+
+    //                 dailyData.unshift({
+    //                     date: targetDate,
+    //                     [measurement]: value,
+    //                 });
+    //             }
+    //             bodyMetricsData = dailyData;
+    //         } else if (frequency === 'weekly') {
+    //             const weeklyData = [];
+    //             for (let i = 0; i < 5; i++) {
+    //                 const startOfWeek = now.subtract(i, 'week').startOf('week').toDate();
+    //                 const endOfWeek = moment(startOfWeek).endOf('week').toDate();
+
+    //                 const weeklyMetrics = await BodyMetrics.find({
+    //                     clientId,
+    //                     createdAt: { $gte: startOfWeek, $lte: endOfWeek },
+    //                 });
+
+    //                 const avgValue = weeklyMetrics.length
+    //                     ? weeklyMetrics.reduce((sum, metric) => sum + metric[measurement], 0) / weeklyMetrics.length
+    //                     : 0;
+
+    //                 weeklyData.unshift({
+    //                     week: `Week ${5 - i}`,
+    //                     [measurement]: avgValue,
+    //                 });
+    //             }
+    //             bodyMetricsData = weeklyData;
+    //         } else if (frequency === 'monthly') {
+    //             const monthlyData = [];
+    //             for (let i = 0; i < 5; i++) {
+    //                 const startOfMonth = now.subtract(i, 'month').startOf('month').toDate();
+    //                 const endOfMonth = moment(startOfMonth).endOf('month').toDate();
+
+    //                 const monthlyMetrics = await BodyMetrics.find({
+    //                     clientId,
+    //                     createdAt: { $gte: startOfMonth, $lte: endOfMonth },
+    //                 });
+
+    //                 const avgValue = monthlyMetrics.length
+    //                     ? monthlyMetrics.reduce((sum, metric) => sum + metric[measurement], 0) / monthlyMetrics.length
+    //                     : 0;
+
+    //                 monthlyData.unshift({
+    //                     month: `Month ${5 - i}`,
+    //                     [measurement]: avgValue,
+    //                 });
+    //             }
+    //             bodyMetricsData = monthlyData;
+    //         }
+
+    //         // Daily Wellness Data
+    //         if (dailyWellness === 'daily') {
+    //             const targetDate = date ? moment(date, 'YYYY-MM-DD').startOf('day').toDate() : now.startOf('day').toDate();
+    //             const nextDay = moment(targetDate).endOf('day').toDate();
+
+    //             dailyWellnessData = await DailyWellness.findOne({
+    //                 clientId,
+    //                 createdAt: { $gte: targetDate, $lte: nextDay },
+    //             });
+    //         } else if (dailyWellness === 'weekly') {
+    //             const weeklyWellnessData = [];
+    //             for (let i = 0; i < 5; i++) {
+    //                 const startOfWeek = now.subtract(i, 'week').startOf('week').toDate();
+    //                 const endOfWeek = moment(startOfWeek).endOf('week').toDate();
+
+    //                 const weeklyMetrics = await DailyWellness.find({
+    //                     clientId,
+    //                     createdAt: { $gte: startOfWeek, $lte: endOfWeek },
+    //                 });
+
+    //                 weeklyWellnessData.unshift(
+    //                     weeklyMetrics.length
+    //                         ? weeklyMetrics
+    //                         : { message: `No wellness data for week ${5 - i}` }
+    //                 );
+    //             }
+    //             dailyWellnessData = weeklyWellnessData;
+    //         } else if (dailyWellness === 'monthly') {
+    //             const monthlyWellnessData = [];
+    //             for (let i = 0; i < 5; i++) {
+    //                 const startOfMonth = now.subtract(i, 'month').startOf('month').toDate();
+    //                 const endOfMonth = moment(startOfMonth).endOf('month').toDate();
+
+    //                 const monthlyMetrics = await DailyWellness.find({
+    //                     clientId,
+    //                     createdAt: { $gte: startOfMonth, $lte: endOfMonth },
+    //                 });
+
+    //                 monthlyWellnessData.unshift(
+    //                     monthlyMetrics.length
+    //                         ? monthlyMetrics
+    //                         : { message: `No wellness data for month ${5 - i}` }
+    //                 );
+    //             }
+    //             dailyWellnessData = monthlyWellnessData;
+    //         }
+
+    //         // Dashboard Data Fetch
+    //         const [
+    //             latestNote,
+    //             latestCheckin,
+    //             latestProgressImage,
+    //             MeasurementCount,
+    //             workoutPlans,
+    //             mealPlans,
+    //             currentWeekMetrics,
+    //             currentWeekCheckins,
+    //             totalWorkouts,
+    //         ] = await Promise.all([
+    //             Note.find({ clientId }).sort({ createdAt: -1 }).populate('clientId', 'name profilePicture'),
+    //             CheckinStatus.findOne({ clientId }).sort({ createdAt: -1 }),
+    //             ProgressImage.find({ clientId }).sort({ createdAt: -1 }),
+    //             BodyMetrics.findOne({ clientId }).sort({ createdAt: -1 }),
+    //             WorkoutPlan.find({ clientId, date: { $gte: now.startOf('week').toDate(), $lte: now.endOf('week').toDate() } }),
+    //             ClientMealPlan.find({ clientId, date: { $gte: now.startOf('week').toDate(), $lte: now.endOf('week').toDate() } }),
+    //             BodyMetrics.find({ clientId, createdAt: { $gte: now.startOf('week').toDate(), $lte: now.endOf('week').toDate() } }),
+    //             CheckinStatus.find({ clientId, createdAt: { $gte: now.startOf('week').toDate(), $lte: now.endOf('week').toDate() } }),
+    //             WorkoutPlan.find({ clientId }),
+    //         ]);
+
+    //         const dashboardData = {
+    //             latestNote,
+    //             latestCheckin,
+    //             latestProgressImage,
+    //             dailyWellness: dailyWellnessData,
+    //             MeasurementCount,
+    //             MeasurementOnFrequency: bodyMetricsData,
+    //         };
+
+    //         return sendResponse(
+    //             res,
+    //             responseStatusCodes.OK,
+    //             'Dashboard data retrieved successfully',
+    //             dashboardData,
+    //             req.logId
+    //         );
+    //     } catch (error) {
+    //         console.error('Error fetching dashboard data:', error);
+    //         return sendResponse(
+    //             res,
+    //             responseStatusCodes.SERVER,
+    //             'Failed to retrieve dashboard data',
+    //             null,
+    //             req.logId
+    //         );
+    //     }
+    // })
+    // dashboard: asyncHandler(async (req, res) => {
+    //     const { id: clientId } = req.params;
+    //     const { frequency = 'weekly', measurement, date, dailyWellness } = req.query;
+
+    //     try {
+    //         const now = moment();
+    //         let bodyMetricsData;
+    //         let dailyWellnessData;
+
+    //         const validMeasurements = ['weight', 'waist', 'hips', 'bodyFat', 'thigh', 'arm'];
+    //         if (!validMeasurements.includes(measurement)) {
+    //             return sendResponse(res, responseStatusCodes.BAD, 'Invalid measurement type provided.');
+    //         }
+
+    //         // Body Metrics Data
+    //         if (frequency === 'daily') {
+    //             const dailyData = [];
+    //             for (let i = 0; i < 5; i++) {
+    //                 const targetDate = now.subtract(i, 'days').startOf('day').toDate();
+    //                 const nextDay = moment(targetDate).endOf('day').toDate();
+
+    //                 const dailyMetric = await BodyMetrics.findOne({
+    //                     clientId,
+    //                     createdAt: { $gte: targetDate, $lte: nextDay },
+    //                 });
+
+    //                 const value = dailyMetric ? dailyMetric[measurement] : 0;
+
+    //                 dailyData.unshift({
+    //                     date: targetDate,
+    //                     [measurement]: value,
+    //                 });
+    //             }
+    //             bodyMetricsData = dailyData;
+    //         } else if (frequency === 'weekly') {
+    //             const weeklyData = [];
+    //             for (let i = 0; i < 5; i++) {
+    //                 const startOfWeek = now.subtract(i, 'week').startOf('week').toDate();
+    //                 const endOfWeek = moment(startOfWeek).endOf('week').toDate();
+
+    //                 const weeklyMetrics = await BodyMetrics.find({
+    //                     clientId,
+    //                     createdAt: { $gte: startOfWeek, $lte: endOfWeek },
+    //                 });
+
+    //                 const avgValue = weeklyMetrics.length
+    //                     ? weeklyMetrics.reduce((sum, metric) => sum + metric[measurement], 0) / weeklyMetrics.length
+    //                     : 0;
+
+    //                 weeklyData.unshift({
+    //                     week: `Week ${5 - i}`,
+    //                     [measurement]: avgValue,
+    //                 });
+    //             }
+    //             bodyMetricsData = weeklyData;
+    //         } else if (frequency === 'monthly') {
+    //             const monthlyData = [];
+    //             for (let i = 0; i < 5; i++) {
+    //                 const startOfMonth = now.subtract(i, 'month').startOf('month').toDate();
+    //                 const endOfMonth = moment(startOfMonth).endOf('month').toDate();
+
+    //                 const monthlyMetrics = await BodyMetrics.find({
+    //                     clientId,
+    //                     createdAt: { $gte: startOfMonth, $lte: endOfMonth },
+    //                 });
+
+    //                 const avgValue = monthlyMetrics.length
+    //                     ? monthlyMetrics.reduce((sum, metric) => sum + metric[measurement], 0) / monthlyMetrics.length
+    //                     : 0;
+
+    //                 monthlyData.unshift({
+    //                     month: `Month ${5 - i}`,
+    //                     [measurement]: avgValue,
+    //                 });
+    //             }
+    //             bodyMetricsData = monthlyData;
+    //         }
+
+    //         // Daily Wellness Data
+
+
+    //         if (dailyWellness === 'daily') {
+    //             // Daily data
+    //             const targetDate = date ? moment(date, 'YYYY-MM-DD').startOf('day').toDate() : now.startOf('day').toDate();
+    //             const nextDay = moment(targetDate).endOf('day').toDate();
+
+    //             console.log('Daily Query Range:', { targetDate, nextDay });
+
+    //             dailyWellnessData = await DailyWellness.findOne({
+    //                 clientId,
+    //                 createdAt: { $gte: targetDate, $lte: nextDay },
+    //             }).lean();
+
+    //             console.log('Daily Wellness Data:', dailyWellnessData);
+
+    //         } else if (dailyWellness === 'weekly') {
+    //             // Weekly data
+    //             const startOfWeek = now.startOf('week').toDate();
+    //             const endOfWeek = now.endOf('week').toDate();
+
+    //             console.log('Weekly Query Range:', { startOfWeek, endOfWeek });
+
+    //             const weeklyMetrics = await DailyWellness.find({
+    //                 clientId,
+    //                 createdAt: { $gte: startOfWeek, $lte: endOfWeek },
+    //             }).lean();
+
+    //             console.log('Weekly Metrics:', weeklyMetrics);
+
+    //             if (weeklyMetrics.length) {
+    //                 const avgData = weeklyMetrics.reduce((acc, metric) => {
+    //                     for (const key in metric) {
+    //                         if (typeof metric[key] === 'number') {
+    //                             acc[key] = (acc[key] || 0) + metric[key];
+    //                         }
+    //                     }
+    //                     return acc;
+    //                 }, {});
+
+    //                 // Calculate averages
+    //                 for (const key in avgData) {
+    //                     avgData[key] /= weeklyMetrics.length;
+    //                 }
+
+    //                 dailyWellnessData = avgData;
+    //             }
+
+    //             console.log('Weekly Average Data:', dailyWellnessData);
+
+    //         } else if (dailyWellness === 'monthly') {
+    //             // Monthly data
+    //             const startOfMonth = now.startOf('month').toDate();
+    //             const endOfMonth = now.endOf('month').toDate();
+
+    //             console.log('Monthly Query Range:', { startOfMonth, endOfMonth });
+
+    //             const monthlyMetrics = await DailyWellness.find({
+    //                 clientId,
+    //                 createdAt: { $gte: startOfMonth, $lte: endOfMonth },
+    //             }).lean();
+
+    //             console.log('Monthly Metrics:', monthlyMetrics);
+
+    //             if (monthlyMetrics.length) {
+    //                 const avgData = monthlyMetrics.reduce((acc, metric) => {
+    //                     for (const key in metric) {
+    //                         if (typeof metric[key] === 'number') {
+    //                             acc[key] = (acc[key] || 0) + metric[key];
+    //                         }
+    //                     }
+    //                     return acc;
+    //                 }, {});
+
+    //                 // Calculate averages
+    //                 for (const key in avgData) {
+    //                     avgData[key] /= monthlyMetrics.length;
+    //                 }
+
+    //                 dailyWellnessData = avgData;
+    //             }
+
+    //             console.log('Monthly Average Data:', dailyWellnessData);
+    //         }
+    //         // Dashboard Data Fetch
+    //         const [
+    //             latestNote,
+    //             latestCheckin,
+    //             latestProgressImage,
+    //             MeasurementCount,
+    //             workoutPlans,
+    //             mealPlans,
+    //             currentWeekMetrics,
+    //             currentWeekCheckins,
+    //             totalWorkouts,
+    //         ] = await Promise.all([
+    //             Note.find({ clientId }).sort({ createdAt: -1 }).populate('clientId', 'name profilePicture'),
+    //             CheckinStatus.findOne({ clientId }).sort({ createdAt: -1 }),
+    //             ProgressImage.find({ clientId }).sort({ createdAt: -1 }),
+    //             BodyMetrics.findOne({ clientId }).sort({ createdAt: -1 }),
+    //             WorkoutPlan.find({ clientId, date: { $gte: now.startOf('week').toDate(), $lte: now.endOf('week').toDate() } }),
+    //             ClientMealPlan.find({ clientId, date: { $gte: now.startOf('week').toDate(), $lte: now.endOf('week').toDate() } }),
+    //             BodyMetrics.find({ clientId, createdAt: { $gte: now.startOf('week').toDate(), $lte: now.endOf('week').toDate() } }),
+    //             CheckinStatus.find({ clientId, createdAt: { $gte: now.startOf('week').toDate(), $lte: now.endOf('week').toDate() } }),
+    //             WorkoutPlan.find({ clientId }),
+    //         ]);
+
+    //         const dashboardData = {
+    //             latestNote,
+    //             latestCheckin,
+    //             latestProgressImage,
+    //             dailyWellness: dailyWellnessData,
+    //             MeasurementCount,
+    //             MeasurementOnFrequency: bodyMetricsData,
+    //             workoutPlans,
+    //             mealPlans,
+    //             currentWeekMetrics,
+    //             currentWeekCheckins,
+    //             totalWorkouts,
+    //         };
+
+    //         return sendResponse(
+    //             res,
+    //             responseStatusCodes.OK,
+    //             'Dashboard data retrieved successfully',
+    //             dashboardData,
+    //             req.logId
+    //         );
+    //     } catch (error) {
+    //         console.error('Error fetching dashboard data:', error);
+    //         return sendResponse(
+    //             res,
+    //             responseStatusCodes.SERVER,
+    //             'Failed to retrieve dashboard data',
+    //             null,
+    //             req.logId
+    //         );
+    //     }
+    // })
     dashboard: asyncHandler(async (req, res) => {
         const { id: clientId } = req.params;
-        const { frequency = 'weekly', date } = req.query;
+        const { frequency = 'weekly', measurement, date, dailyWellness } = req.query;
 
         try {
             const now = moment();
@@ -340,6 +859,84 @@ const clientController = {
 
             let bodyMetricsData;
 
+            // if (frequency === 'daily') {
+            //     const dailyData = [];
+            //     for (let i = 0; i < 5; i++) {
+            //         const targetDate = now.subtract(i, 'days').startOf('day').toDate();
+            //         const nextDay = moment(targetDate).endOf('day').toDate();
+
+            //         const dailyMetric = await BodyMetrics.findOne({
+            //             clientId,
+            //             createdAt: { $gte: targetDate, $lte: nextDay },
+            //         });
+
+            //         dailyData.unshift({
+            //             date: targetDate,
+            //             weight: dailyMetric ? dailyMetric.weight : 0,
+            //         });
+            //     }
+            //     bodyMetricsData = dailyData;
+            // } else if (frequency === 'weekly') {
+            //     const weeklyData = [];
+            //     for (let i = 0; i < 5; i++) {
+            //         const startOfWeek = now.subtract(i, 'week').startOf('week').toDate();
+            //         const endOfWeek = moment(startOfWeek).endOf('week').toDate();
+
+            //         const weeklyMetrics = await BodyMetrics.find({
+            //             clientId,
+            //             createdAt: { $gte: startOfWeek, $lte: endOfWeek },
+            //         });
+
+            //         if (weeklyMetrics.length > 0) {
+            //             const avgWeight =
+            //                 weeklyMetrics.reduce((sum, metric) => sum + metric.weight, 0) / weeklyMetrics.length;
+            //             weeklyData.unshift({
+            //                 week: `Week ${5 - i}`,
+            //                 avgWeight,
+            //             });
+            //         } else {
+            //             weeklyData.unshift({
+            //                 week: `Week ${5 - i}`,
+            //                 avgWeight: 0,
+            //             });
+            //         }
+            //     }
+            //     bodyMetricsData = weeklyData;
+            // } else if (frequency === 'monthly') {
+            //     const monthlyData = [];
+            //     for (let i = 0; i < 5; i++) {
+            //         const startOfMonth = now.subtract(i, 'month').startOf('month').toDate();
+            //         const endOfMonth = moment(startOfMonth).endOf('month').toDate();
+
+            //         const monthlyMetrics = await BodyMetrics.find({
+            //             clientId,
+            //             createdAt: { $gte: startOfMonth, $lte: endOfMonth },
+            //         });
+
+            //         if (monthlyMetrics.length > 0) {
+            //             const avgWeight =
+            //                 monthlyMetrics.reduce((sum, metric) => sum + metric.weight, 0) / monthlyMetrics.length;
+            //             monthlyData.unshift({
+            //                 month: `Month ${5 - i}`,
+            //                 avgWeight,
+            //             });
+            //         } else {
+            //             monthlyData.unshift({
+            //                 month: `Month ${5 - i}`,
+            //                 avgWeight: 0,
+            //             });
+            //         }
+            //     }
+            //     bodyMetricsData = monthlyData;
+            // }
+
+            const validMeasurements = ['weight', 'waist', 'hips', 'bodyFat', 'thigh', 'arm'];
+
+            if (!validMeasurements.includes(measurement)) {
+                return sendResponse(res, responseStatusCodes.BAD, 'Invalid measurement type provided.');
+            }
+
+            // Handle daily frequency
             if (frequency === 'daily') {
                 const dailyData = [];
                 for (let i = 0; i < 5; i++) {
@@ -351,13 +948,18 @@ const clientController = {
                         createdAt: { $gte: targetDate, $lte: nextDay },
                     });
 
+                    // Retrieve the dynamic measurement value (e.g., weight, bodyFat, etc.)
+                    const value = dailyMetric ? dailyMetric[measurement] : 0;
+
                     dailyData.unshift({
                         date: targetDate,
-                        weight: dailyMetric ? dailyMetric.weight : 0,
+                        [measurement]: value,
                     });
                 }
                 bodyMetricsData = dailyData;
-            } else if (frequency === 'weekly') {
+            }
+            // Handle weekly frequency
+            else if (frequency === 'weekly') {
                 const weeklyData = [];
                 for (let i = 0; i < 5; i++) {
                     const startOfWeek = now.subtract(i, 'week').startOf('week').toDate();
@@ -368,22 +970,24 @@ const clientController = {
                         createdAt: { $gte: startOfWeek, $lte: endOfWeek },
                     });
 
+                    // Calculate the average for the specific measurement
                     if (weeklyMetrics.length > 0) {
-                        const avgWeight =
-                            weeklyMetrics.reduce((sum, metric) => sum + metric.weight, 0) / weeklyMetrics.length;
+                        const avgValue = weeklyMetrics.reduce((sum, metric) => sum + metric[measurement], 0) / weeklyMetrics.length;
                         weeklyData.unshift({
                             week: `Week ${5 - i}`,
-                            avgWeight,
+                            [measurement]: avgValue,
                         });
                     } else {
                         weeklyData.unshift({
                             week: `Week ${5 - i}`,
-                            avgWeight: 0,
+                            [measurement]: 0,
                         });
                     }
                 }
                 bodyMetricsData = weeklyData;
-            } else if (frequency === 'monthly') {
+            }
+            // Handle monthly frequency
+            else if (frequency === 'monthly') {
                 const monthlyData = [];
                 for (let i = 0; i < 5; i++) {
                     const startOfMonth = now.subtract(i, 'month').startOf('month').toDate();
@@ -394,17 +998,17 @@ const clientController = {
                         createdAt: { $gte: startOfMonth, $lte: endOfMonth },
                     });
 
+                    // Calculate the average for the specific measurement
                     if (monthlyMetrics.length > 0) {
-                        const avgWeight =
-                            monthlyMetrics.reduce((sum, metric) => sum + metric.weight, 0) / monthlyMetrics.length;
+                        const avgValue = monthlyMetrics.reduce((sum, metric) => sum + metric[measurement], 0) / monthlyMetrics.length;
                         monthlyData.unshift({
                             month: `Month ${5 - i}`,
-                            avgWeight,
+                            [measurement]: avgValue,
                         });
                     } else {
                         monthlyData.unshift({
                             month: `Month ${5 - i}`,
-                            avgWeight: 0,
+                            [measurement]: 0,
                         });
                     }
                 }
@@ -443,6 +1047,7 @@ const clientController = {
                 WorkoutPlan.find({ clientId }),
             ]);
 
+            // console.log('currentWeekMetrics', currentWeekMetrics)
             const currentWeekAverages = {
                 weightLoss: currentWeekMetrics.length
                     ? currentWeekMetrics.reduce((sum, metric) => sum + metric.weightLoss, 0) / currentWeekMetrics.length
@@ -758,6 +1363,119 @@ const clientController = {
 
         return sendResponse(res, responseStatusCodes.OK, `${userType} OTP validated successfully.`, null);
     }),
+
+
+
+    progressList: asyncHandler(async (req, res) => {
+        const clientData = await clientModel.aggregate([
+            {
+                $lookup: {
+                    from: 'progressimages',
+
+                    localField: '_id',
+                    foreignField: 'clientId',
+                    as: 'progressImages',
+                }
+            },
+            {
+                $lookup: {
+                    from: 'workoutplans',
+                    localField: '_id',
+                    foreignField: 'clientId',
+                    as: 'workouts'
+                }
+            },
+            {
+                $unwind: {
+                    path: '$progressImages',
+                    preserveNullAndEmptyArrays: true
+                }
+            },
+            {
+                $unwind: {
+                    path: '$progressImages.images',
+                    preserveNullAndEmptyArrays: true
+                }
+            },
+            {
+                $group: {
+                    _id: '$_id',
+                    name: { $first: '$name' },
+                    email: { $first: '$email' },
+                    phone: { $first: '$phone' },
+                    gender: { $first: '$gender' },
+                    isActive: { $first: '$isActive' },
+                    address: { $first: '$address' },
+                    profilePicture: { $first: '$profilePicture' },
+                    lastLogin: { $first: '$lastLogin' },
+                    progressImages: {
+                        $push: {
+                            url: '$progressImages.images.url',
+                            uploadedAt: '$progressImages.images.uploadedAt',
+                            description: '$progressImages.images.description',
+                        }
+                    },
+                    workouts: { $first: '$workouts' },
+                    lastWorkouts: { $first: '$workouts.createdAt' }
+                }
+            },
+            {
+                $addFields: {
+                    progressImages: { $ifNull: ['$progressImages', []] },
+                    workouts: { $ifNull: ['$workouts', []] },
+                    lastWorkout: {
+                        $arrayElemAt: [{
+                            $filter: {
+                                input: '$workouts',
+                                as: 'workout',
+                                cond: { $eq: ['$$workout.status', 'Assigned'] }
+                            }
+                        }, 0]
+                    },
+                    completedWorkoutsCount: {
+                        $size: {
+                            $filter: {
+                                input: '$workouts',
+                                as: 'workout',
+                                cond: { $eq: ['$$workout.status', 'Completed'] }
+                            }
+                        }
+                    },
+                    assignedWorkoutsCount: {
+                        $size: '$workouts'
+                    },
+                }
+            },
+            {
+                $project: {
+                    _id: 1,
+                    name: 1,
+                    email: 1,
+                    phone: 1,
+                    gender: 1,
+                    isActive: 1,
+                    address: 1,
+                    profilePicture: 1,
+                    lastLogin: 1,
+                    progressImages: {
+                        $filter: {
+                            input: '$progressImages',
+                            as: 'image',
+                            cond: { $ne: ['$$image.url', null] }
+                        }
+                    },
+                    lastWorkout: {
+                        date: '$lastWorkout.date',
+                        assignedAt: '$lastWorkout.date'
+                    },
+                    completedWorkoutsCount: 1,
+                    assignedWorkoutsCount: 1,
+                }
+            }
+        ]);
+
+        return sendResponse(res, responseStatusCodes.OK, `Fetched client progress successfully`, clientData);
+    })
 
 }
 

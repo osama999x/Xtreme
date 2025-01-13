@@ -5,26 +5,71 @@ const asyncHandler = require('express-async-handler');
 const MeetingModel = require('./meetingModel');
 
 class MeetingController {
+    // getUpcomingMeetings = asyncHandler(async (req, res) => {
+    //     const currentDate = new Date();
+
+    //     const upcomingMeetings = await MeetingModel.find({
+    //         meetingDate: { $gte: currentDate },
+    //         status: { $in: ['Pending', 'Confirmed'] }
+    //     })
+    //         .populate('clientId', 'name')
+    //         .lean();
+
+    //     const totalCount = upcomingMeetings.length;
+
+    //     return sendResponse(
+    //         res,
+    //         200,
+    //         'All upcoming meetings retrieved successfully',
+    //         { totalCount, meetings: upcomingMeetings }
+    //     );
+    // });
+
     getUpcomingMeetings = asyncHandler(async (req, res) => {
-        const currentDate = new Date();
+        try {
+            const currentDate = new Date();
 
-        const upcomingMeetings = await MeetingModel.find({
-            meetingDate: { $gte: currentDate },
-            status: { $in: ['Pending', 'Confirmed'] }
-        })
-            .populate('clientId', 'name')
-            .lean();
+            console.log('Current Date:', currentDate);
 
-        const totalCount = upcomingMeetings.length;
 
-        return sendResponse(
-            res,
-            200,
-            'All upcoming meetings retrieved successfully',
-            { totalCount, meetings: upcomingMeetings }
-        );
+            const upcomingMeetings = await MeetingModel.find({
+                meetingDate: { $gte: currentDate },
+                status: { $in: ['Pending', 'Confirmed'] }
+            })
+                .populate('clientId', 'name')
+                .lean();
+
+            console.log('Upcoming Meetings:', upcomingMeetings);
+
+
+            if (!upcomingMeetings || upcomingMeetings.length === 0) {
+                return sendResponse(
+                    res,
+                    200,
+                    'No upcoming meetings found',
+                    { totalCount: 0, meetings: [] }
+                );
+            }
+
+            const totalCount = upcomingMeetings.length;
+
+            return sendResponse(
+                res,
+                200,
+                'All upcoming meetings retrieved successfully',
+                { totalCount, meetings: upcomingMeetings }
+            );
+        } catch (error) {
+            console.error('Error retrieving upcoming meetings:', error);
+
+            return sendResponse(
+                res,
+                500,
+                'An error occurred while retrieving upcoming meetings',
+                null
+            );
+        }
     });
-
 
     create = asyncHandler(async (req, res) => {
         await meetingValidator.create.validateAsync(req.body);

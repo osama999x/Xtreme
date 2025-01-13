@@ -2,16 +2,24 @@ const asyncHandler = require('express-async-handler');
 const dailyWellnessService = require('./dailyWellnessService');
 const sendResponse = require('../../utils/sendResponse');
 const responseStatusCodes = require('../../constants/responseStatusCodes');
+const workoutStatus = require('../workout/workoutPlanServices')
+const clientMealPlanStatus = require('../clientMealPlan/clientMealPlanService')
+
 
 const dailyWellnessController = {
     create: asyncHandler(async (req, res) => {
         const dailyWellness = await dailyWellnessService.create(req.body);
-        return sendResponse(
-            res,
-            responseStatusCodes.CREATED,
-            'Daily wellness record created successfully',
-            dailyWellness
-        );
+        console.log(`req.body`, req.body)
+        const updateWorkoutPlanStatus = await workoutStatus.updateWorkoutPlanStatus(req.body.clientId, req.body.date, req.body.workouts);
+        const updateClientMealPlanStatus = await clientMealPlanStatus.updateMealPlanStatus(req.body.clientId, req.body.date, req.body.clientMealPlan);
+        if (dailyWellness) {
+            return sendResponse(
+                res,
+                responseStatusCodes.CREATED,
+                'Daily wellness record created successfully',
+                dailyWellness
+            );
+        }
     }),
 
     update: asyncHandler(async (req, res) => {

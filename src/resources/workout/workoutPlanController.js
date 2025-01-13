@@ -337,175 +337,6 @@ Follow this structure:
         }
     }),
 
-    saveGPTWorkoutPlan: asyncHandler(async (req, res) => {
-        const validationResult = workoutPlanValidator.saveGpt.validate(req.body);
-        if (validationResult.error) {
-            return sendResponse(
-                res,
-                responseStatusCodes.BAD,
-                validationResult.error.details[0].message,
-                null,
-                req.logId
-            );
-        }
-
-        const { clientId, createdBy, exercises, day, date, period } = req.body;
-
-        const client = await clientServices.getById(clientId);
-        if (!client) {
-            return sendResponse(
-                res,
-                responseStatusCodes.NOTFOUND,
-                'Client not found',
-                null,
-                req.logId
-            );
-        }
-
-        const admin = await adminUserModel.findById(createdBy);
-        if (!admin) {
-            return sendResponse(
-                res,
-                responseStatusCodes.NOTFOUND,
-                'Admin not found',
-                null,
-                req.logId
-            );
-        }
-
-
-        const existingPlan = await WorkoutPlan.findOne({ clientId, date });
-        if (existingPlan) {
-            existingPlan.exercises = await Promise.all(
-                exercises.map(async (exercise) => {
-                    const newExercise = new exerciseModel(exercise);
-                    const savedExercise = await newExercise.save();
-
-                    return {
-                        exerciseId: savedExercise._id,
-                        primaryFocus: savedExercise.primaryFocus,
-                        intensity: exercise.intensity,
-                        duration: exercise.duration,
-                        sets: exercise.sets,
-                        reps: exercise.reps,
-                    };
-                })
-            );
-
-            existingPlan.day = day;
-            existingPlan.period = period || existingPlan.period;
-            existingPlan.createdBy = createdBy;
-            existingPlan.status = 'Assigned';
-
-            await existingPlan.save();
-
-            client.workoutPlanStatus = 'Assigned';
-            await client.save();
-
-            const notificationData = {
-                title: 'Workout Plan Updated',
-                body: `Your workout plan for ${date} has been updated by ${admin.firstName} ${admin.lastName}.`,
-                message: `Your workout plan for ${date} has been updated by ${admin.firstName} ${admin.lastName}.`,
-                clientId: client._id,
-                adminId: admin._id,
-            };
-
-            await Notification.createNotification(notificationData);
-
-            if (client.fcmToken) {
-                const pushNotificationData = {
-                    title: 'Workout Plan Updated',
-                    body: `Your workout plan for ${date} has been updated by ${admin.firstName} ${admin.lastName}.`,
-                    data: { workoutPlanId: existingPlan._id.toString() },
-                    fcmToken: client.fcmToken,
-                };
-
-                await systemNotificationServices.newNotification(
-                    pushNotificationData.body,
-                    pushNotificationData.title,
-                    pushNotificationData.fcmToken,
-                    pushNotificationData.data,
-                    null
-                );
-            }
-
-            return sendResponse(
-                res,
-                responseStatusCodes.OK,
-                'Workout Plan updated successfully',
-                existingPlan,
-                req.logId
-            );
-        }
-
-
-        const savedExercises = await Promise.all(
-            exercises.map(async (exercise) => {
-                const newExercise = new exerciseModel(exercise);
-                const savedExercise = await newExercise.save();
-
-                return {
-                    exerciseId: savedExercise._id,
-                    primaryFocus: savedExercise.primaryFocus,
-                    intensity: exercise.intensity,
-                    duration: exercise.duration,
-                    sets: exercise.sets,
-                    reps: exercise.reps,
-                };
-            })
-        );
-
-        const workoutPlan = new WorkoutPlan({
-            clientId,
-            createdBy,
-            day,
-            date,
-            period,
-            exercises: savedExercises,
-            status: 'Assigned',
-        });
-
-        await workoutPlan.save();
-
-        client.workoutPlanStatus = 'Assigned';
-        await client.save();
-
-        const notificationData = {
-            title: 'New Workout Plan Assigned',
-            body: `A new workout plan has been assigned to you by ${admin.firstName} ${admin.lastName}.`,
-            message: `You have received a new workout plan from ${admin.firstName} ${admin.lastName}.`,
-            clientId: client._id,
-            adminId: admin._id,
-        };
-
-        await Notification.createNotification(notificationData);
-
-        if (client.fcmToken) {
-            const pushNotificationData = {
-                title: 'New Workout Plan Assigned',
-                body: `A new workout plan has been assigned to you by ${admin.firstName} ${admin.lastName}.`,
-                data: { workoutPlanId: workoutPlan._id.toString() },
-                fcmToken: client.fcmToken,
-            };
-
-            await systemNotificationServices.newNotification(
-                pushNotificationData.body,
-                pushNotificationData.title,
-                pushNotificationData.fcmToken,
-                pushNotificationData.data,
-                null
-            );
-        }
-
-        return sendResponse(
-            res,
-            responseStatusCodes.CREATED,
-            'Workout Plan created successfully',
-            workoutPlan,
-            req.logId
-        );
-    })
-    ,
     // saveGPTWorkoutPlan: asyncHandler(async (req, res) => {
     //     const validationResult = workoutPlanValidator.saveGpt.validate(req.body);
     //     if (validationResult.error) {
@@ -541,6 +372,72 @@ Follow this structure:
     //             req.logId
     //         );
     //     }
+
+
+    //     const existingPlan = await WorkoutPlan.findOne({ clientId, date });
+    //     if (existingPlan) {
+    //         existingPlan.exercises = await Promise.all(
+    //             exercises.map(async (exercise) => {
+    //                 const newExercise = new exerciseModel(exercise);
+    //                 const savedExercise = await newExercise.save();
+
+    //                 return {
+    //                     exerciseId: savedExercise._id,
+    //                     primaryFocus: savedExercise.primaryFocus,
+    //                     intensity: exercise.intensity,
+    //                     duration: exercise.duration,
+    //                     sets: exercise.sets,
+    //                     reps: exercise.reps,
+    //                 };
+    //             })
+    //         );
+
+    //         existingPlan.day = day;
+    //         existingPlan.period = period || existingPlan.period;
+    //         existingPlan.createdBy = createdBy;
+    //         existingPlan.status = 'Assigned';
+
+    //         await existingPlan.save();
+
+    //         client.workoutPlanStatus = 'Assigned';
+    //         await client.save();
+
+    //         const notificationData = {
+    //             title: 'Workout Plan Updated',
+    //             body: `Your workout plan for ${date} has been updated by ${admin.firstName} ${admin.lastName}.`,
+    //             message: `Your workout plan for ${date} has been updated by ${admin.firstName} ${admin.lastName}.`,
+    //             clientId: client._id,
+    //             adminId: admin._id,
+    //         };
+
+    //         await Notification.createNotification(notificationData);
+
+    //         if (client.fcmToken) {
+    //             const pushNotificationData = {
+    //                 title: 'Workout Plan Updated',
+    //                 body: `Your workout plan for ${date} has been updated by ${admin.firstName} ${admin.lastName}.`,
+    //                 data: { workoutPlanId: existingPlan._id.toString() },
+    //                 fcmToken: client.fcmToken,
+    //             };
+
+    //             await systemNotificationServices.newNotification(
+    //                 pushNotificationData.body,
+    //                 pushNotificationData.title,
+    //                 pushNotificationData.fcmToken,
+    //                 pushNotificationData.data,
+    //                 null
+    //             );
+    //         }
+
+    //         return sendResponse(
+    //             res,
+    //             responseStatusCodes.OK,
+    //             'Workout Plan updated successfully',
+    //             existingPlan,
+    //             req.logId
+    //         );
+    //     }
+
 
     //     const savedExercises = await Promise.all(
     //         exercises.map(async (exercise) => {
@@ -607,8 +504,189 @@ Follow this structure:
     //         workoutPlan,
     //         req.logId
     //     );
-    // }),
+    // })
+    // ,
 
+
+    saveGPTWorkoutPlan: asyncHandler(async (req, res) => {
+        const validationResult = workoutPlanValidator.saveGpt.validate(req.body);
+        if (validationResult.error) {
+            return sendResponse(
+                res,
+                responseStatusCodes.BAD,
+                validationResult.error.details[0].message,
+                null,
+                req.logId
+            );
+        }
+
+        const { clientId, createdBy, exercises, day, date, period } = req.body;
+
+        const client = await clientServices.getById(clientId);
+        if (!client) {
+            return sendResponse(
+                res,
+                responseStatusCodes.NOTFOUND,
+                'Client not found',
+                null,
+                req.logId
+            );
+        }
+
+        const admin = await adminUserModel.findById(createdBy);
+        if (!admin) {
+            return sendResponse(
+                res,
+                responseStatusCodes.NOTFOUND,
+                'Admin not found',
+                null,
+                req.logId
+            );
+        }
+
+        const existingPlan = await WorkoutPlan.findOne({ clientId, date });
+        if (existingPlan) {
+            existingPlan.exercises = await Promise.all(
+                exercises.map(async (exercise) => {
+                    // Check for existing exercise by name
+                    let existingExercise = await exerciseModel.findOne({ name: exercise.name });
+
+                    if (!existingExercise) {
+                        // If no existing exercise, create a new one
+                        const newExercise = new exerciseModel(exercise);
+                        existingExercise = await newExercise.save();
+                    }
+
+                    return {
+                        exerciseId: existingExercise._id,
+                        primaryFocus: existingExercise.primaryFocus,
+                        intensity: exercise.intensity,
+                        duration: exercise.duration,
+                        sets: exercise.sets,
+                        reps: exercise.reps,
+                    };
+                })
+            );
+
+            existingPlan.day = day;
+            existingPlan.period = period || existingPlan.period;
+            existingPlan.createdBy = createdBy;
+            existingPlan.status = 'Assigned';
+
+            await existingPlan.save();
+
+            client.workoutPlanStatus = 'Assigned';
+            await client.save();
+
+            const notificationData = {
+                title: 'Workout Plan Updated',
+                body: `Your workout plan for ${date} has been updated by ${admin.firstName} ${admin.lastName}.`,
+                message: `Your workout plan for ${date} has been updated by ${admin.firstName} ${admin.lastName}.`,
+                clientId: client._id,
+                adminId: admin._id,
+            };
+
+            await Notification.createNotification(notificationData);
+
+            if (client.fcmToken) {
+                const pushNotificationData = {
+                    title: 'Workout Plan Updated',
+                    body: `Your workout plan for ${date} has been updated by ${admin.firstName} ${admin.lastName}.`,
+                    data: { workoutPlanId: existingPlan._id.toString() },
+                    fcmToken: client.fcmToken,
+                };
+
+                await systemNotificationServices.newNotification(
+                    pushNotificationData.body,
+                    pushNotificationData.title,
+                    pushNotificationData.fcmToken,
+                    pushNotificationData.data,
+                    null
+                );
+            }
+
+            return sendResponse(
+                res,
+                responseStatusCodes.OK,
+                'Workout Plan updated successfully',
+                existingPlan,
+                req.logId
+            );
+        }
+
+        const savedExercises = await Promise.all(
+            exercises.map(async (exercise) => {
+                // Check for existing exercise by name
+                let existingExercise = await exerciseModel.findOne({ name: exercise.name });
+
+                if (!existingExercise) {
+                    // If no existing exercise, create a new one
+                    const newExercise = new exerciseModel(exercise);
+                    existingExercise = await newExercise.save();
+                }
+
+                return {
+                    exerciseId: existingExercise._id,
+                    primaryFocus: existingExercise.primaryFocus,
+                    intensity: exercise.intensity,
+                    duration: exercise.duration,
+                    sets: exercise.sets,
+                    reps: exercise.reps,
+                };
+            })
+        );
+
+        const workoutPlan = new WorkoutPlan({
+            clientId,
+            createdBy,
+            day,
+            date,
+            period,
+            exercises: savedExercises,
+            status: 'Assigned',
+        });
+
+        await workoutPlan.save();
+
+        client.workoutPlanStatus = 'Assigned';
+        await client.save();
+
+        const notificationData = {
+            title: 'New Workout Plan Assigned',
+            body: `A new workout plan has been assigned to you by ${admin.firstName} ${admin.lastName}.`,
+            message: `You have received a new workout plan from ${admin.firstName} ${admin.lastName}.`,
+            clientId: client._id,
+            adminId: admin._id,
+        };
+
+        await Notification.createNotification(notificationData);
+
+        if (client.fcmToken) {
+            const pushNotificationData = {
+                title: 'New Workout Plan Assigned',
+                body: `A new workout plan has been assigned to you by ${admin.firstName} ${admin.lastName}.`,
+                data: { workoutPlanId: workoutPlan._id.toString() },
+                fcmToken: client.fcmToken,
+            };
+
+            await systemNotificationServices.newNotification(
+                pushNotificationData.body,
+                pushNotificationData.title,
+                pushNotificationData.fcmToken,
+                pushNotificationData.data,
+                null
+            );
+        }
+
+        return sendResponse(
+            res,
+            responseStatusCodes.CREATED,
+            'Workout Plan created successfully',
+            workoutPlan,
+            req.logId
+        );
+    })
+    ,
     getAllWorkoutPlansByClient: asyncHandler(async (req, res) => {
         const { clientId, date } = req.body;
         // console.log("clientId", clientId)
@@ -695,58 +773,34 @@ Follow this structure:
     }),
 
     updateWorkoutPlanStatus: asyncHandler(async (req, res) => {
-        const { clientId, date, status } = req.body;
-
-        if (!clientId || !date || !status) {
-            return sendResponse(res, responseStatusCodes.BAD, 'clientId, date, and status are required.');
-        }
-
         try {
+            const { clientId, date, status } = req.body;
 
-            const workoutPlan = await WorkoutPlan.findOne({
-                clientId,
-                date: new Date(date),
-            });
+            const updatedWorkoutPlan = await workoutPlanServices.updateWorkoutPlanStatus(clientId, date, status);
 
-            if (!workoutPlan) {
-                return sendResponse(res, responseStatusCodes.NOTFOUND, 'Workout plan not found for the given date and clientId.');
+            if (updatedWorkoutPlan) {
+                return sendResponse(
+                    res,
+                    responseStatusCodes.OK,
+                    'Workout plan status updated successfully.',
+                    updatedWorkoutPlan
+                );
+            } else {
+                console.log('Workout plan not found for the given date and clientId.');
+                return sendResponse(
+                    res,
+                    responseStatusCodes.NOTFOUND,
+                    'Workout plan not found for the given date and clientId.'
+                );
             }
-
-            workoutPlan.status = status;
-            await workoutPlan.save();
-
-
-            const client = await Client.findById(clientId);
-            if (client) {
-                const { workoutPlanStatusStartDate, workoutPlanStatusEndDate } = client;
-
-                if (workoutPlanStatusStartDate && workoutPlanStatusEndDate) {
-                    const workoutPlansInRange = await WorkoutPlan.find({
-                        clientId,
-                        date: { $gte: workoutPlanStatusStartDate, $lte: workoutPlanStatusEndDate },
-                    });
-
-                    const allCompleted = workoutPlansInRange.every(plan => plan.status === 'Completed');
-
-                    if (allCompleted) {
-                        client.workoutPlanStatus = 'Not Requested';
-                        client.workoutPlanStatusStartDate = null;
-                        client.workoutPlanStatusEndDate = null;
-                    } else {
-                        client.workoutPlanStatus = 'Assigned';
-                    }
-
-                    await client.save();
-                }
-            }
-
-            return sendResponse(res, responseStatusCodes.OK, 'Workout plan status updated successfully.', workoutPlan);
         } catch (error) {
-            console.error('Error updating workout plan status:', error);
-            return sendResponse(res, responseStatusCodes.ERROR, 'Internal server error.');
+            console.error('Error in updateWorkoutPlanStatus controller:', error);
+            return sendResponse(res, responseStatusCodes.SERVER, 'Internal server error.');
         }
-    })
-    ,
+    }),
+
+
+
 };
 
 module.exports = workoutPlanController;

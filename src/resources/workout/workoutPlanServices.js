@@ -1,5 +1,7 @@
 const workoutPlanModel = require('./workoutPlanModel');
 const mongoose = require('mongoose');
+const Client = require('../clients/clientModel')
+
 
 const workoutPlanServices = {
     create: async (data) => {
@@ -139,6 +141,15 @@ const workoutPlanServices = {
         }
     }
 
+    , getByClientAndDate: async (clientId, date) => {
+        try {
+
+            return await workoutPlanModel.findOne({ clientId, date });
+        } catch (error) {
+            console.error('Error fetching workout plan by client and date:', error);
+            throw new Error('Could not fetch workout plan');
+        }
+    }
     ,
     update: async (id, data) => {
         return await workoutPlanModel.findByIdAndUpdate(id, data, { new: true });
@@ -148,29 +159,28 @@ const workoutPlanServices = {
     },
     getById: async (id) => {
         try {
-            // Ensure the ID is a valid ObjectId
             if (!mongoose.Types.ObjectId.isValid(id)) {
                 throw new Error('Invalid ID format');
             }
 
             const workoutPlan = await workoutPlanModel.aggregate([
                 {
-                    $match: { _id: new mongoose.Types.ObjectId(id) } // Match by the provided ID
+                    $match: { _id: new mongoose.Types.ObjectId(id) }
                 },
                 {
                     $lookup: {
-                        from: 'exercises', // Join with the exercises collection
-                        localField: 'exercises.exerciseId', // The field in workoutPlan
-                        foreignField: '_id', // The field in exercises
-                        as: 'exerciseDetails' // Alias for the joined data
+                        from: 'exercises',
+                        localField: 'exercises.exerciseId',
+                        foreignField: '_id',
+                        as: 'exerciseDetails'
                     }
                 },
                 {
                     $lookup: {
-                        from: 'meals', // Join with the meals collection
-                        localField: 'meals.mealId', // The field in workoutPlan
-                        foreignField: '_id', // The field in meals
-                        as: 'mealDetails' // Alias for the joined data
+                        from: 'meals',
+                        localField: 'meals.mealId',
+                        foreignField: '_id',
+                        as: 'mealDetails'
                     }
                 },
                 {
@@ -245,22 +255,63 @@ const workoutPlanServices = {
                             }
                         },
                         createdAt: 1,
-                        updatedAt: 1 // Include the timestamps
+                        updatedAt: 1
                     }
                 }
             ]);
 
-            // Check if workoutPlan is found
             if (workoutPlan.length === 0) {
                 throw new Error('Workout plan not found');
             }
 
-            return workoutPlan[0]; // Return the first (and only) workout plan
+            return workoutPlan[0];
         } catch (error) {
             throw new Error(`Error fetching workout plan: ${error.message}`);
         }
     }
     ,
+    updateWorkoutPlanStatus: async (clientId, date, status) => {
+
+
+        try {
+            console.log('clientId', clientId)
+            console.log('date', date)
+            console.log('status', status)
+            const workoutPlan = await workoutPlanModel.findOne({
+                clientId,
+                date: new Date(date),
+            });
+
+            if (!workoutPlan) {
+                console.log('Workout plan not found for the given date and clientId.');
+                return null;
+            }
+
+            workoutPlan.status = status;
+            await workoutPlan.save();
+
+            const client = await Client.findById(clientId);
+            if (client) {
+                const workoutPlansInRange = await workoutPlanModel.find({ clientId });
+                const allCompleted = workoutPlansInRange.every(plan => plan.status && plan.status === 'Not Completed' && plan.status === 'Completed');
+
+                if (allCompleted) {
+                    client.workoutPlanStatus = 'Not Requested';
+                    client.workoutPlanStatusStartDate = null;
+                    client.workoutPlanStatusEndDate = null;
+                } else {
+                    client.workoutPlanStatus = 'Assigned';
+                }
+
+                await client.save();
+            }
+
+            return workoutPlan;
+        } catch (error) {
+            console.error('Error updating workout plan status:', error);
+            throw new Error('Internal server error');
+        }
+    }
 };
 
 module.exports = workoutPlanServices;

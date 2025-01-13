@@ -14,8 +14,8 @@ const clientSchema = new Schema(
         },
         password: {
             type: String,
-            required: true,
         },
+        googleId: { type: String, unique: true },
         gender: {
             type: String,
             enum: ['Male', 'Female', 'Other'],
@@ -67,6 +67,7 @@ const clientSchema = new Schema(
             type: Date,
 
         },
+        calendlyToken: { String },
         mealPlanStatus: {
             type: String,
             enum: ['Not Requested', 'Requested', 'Assigned', 'Completed'],

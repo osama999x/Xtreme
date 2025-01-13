@@ -10,10 +10,9 @@ mealRouter
 mealRouter
     .route('/:id')
     .get(mealController.getMealById)
-    .put(mealController.updateMeal)
     .delete(mealController.deleteMeal);
 mealRouter.post('/mealWithRecipes', mealController.createMealWithRecipes);
-
-mealRouter.patch('/:mealId', mealController.updateMealAndRecipes);
+mealRouter.put('/update/:id', mealController.updateMeal);
+mealRouter.put('/:mealId', mealController.updateMealAndRecipes);
 
 module.exports = mealRouter;

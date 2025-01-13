@@ -90,25 +90,62 @@ const clientServices = {
             throw error;
         }
     },
-    requestPlan: async (clientId, planType, startDate, endDate) => {
-        const existingPlan = await clientModel.findOne({
-            _id: clientId,
-            [`${planType}PlanStatus`]: { $in: ['Requested', 'Assigned'] },
-            [`${planType}PlanStatusStartDate`]: { $lte: endDate },
-            [`${planType}PlanStatusEndDate`]: { $gte: startDate }
-        });
+    // requestPlan: async (clientId, planType, startDate, endDate) => {
+    //     const existingPlan = await clientModel.findOne({
+    //         _id: clientId,
+    //         [`${planType}PlanStatus`]: { $in: ['Requested', 'Assigned'] },
+    //         [`${planType}PlanStatusStartDate`]: { $lte: endDate },
+    //         [`${planType}PlanStatusEndDate`]: { $gte: startDate }
+    //     });
 
-        if (existingPlan) {
-            throw new Error(
-                `Client already has a ${existingPlan[`${planType}PlanStatus`]} ${planType} plan between ${startDate} and ${endDate}.`
-            );
-        }
+    //     if (existingPlan) {
+    //         throw new Error(
+    //             `Client already has a ${existingPlan[`${planType}PlanStatus`]} ${planType} plan between ${startDate} and ${endDate}.`
+    //         );
+    //     }
 
-        // Update the client's plan status and dates
+    //     // Update the client's plan status and dates
+    //     const updateFields = {
+    //         [`${planType}PlanStatus`]: 'Requested',
+    //         [`${planType}PlanStatusStartDate`]: startDate,
+    //         [`${planType}PlanStatusEndDate`]: endDate
+    //     };
+
+    //     const updatedClient = await clientModel.findByIdAndUpdate(
+    //         clientId,
+    //         updateFields,
+    //         { new: true }
+    //     );
+
+    //     const activeAdmins = await adminUserModel
+    //         .find({ isActive: true, isDeleted: false })
+    //         .select('fcmToken')
+    //         .lean();
+
+    //     const client = await clientModel.findById(clientId).select('name').lean();
+    //     const clientName = client?.name || 'Unknown Client';
+
+    //     const title = `${planType === 'workout' ? 'Workout' : 'Meal'} Plan Requested`;
+    //     const body = `Client ${clientName} has requested a ${planType} plan from ${startDate} to ${endDate}`;
+
+    //     for (const admin of activeAdmins) {
+    //         if (admin.fcmToken) {
+    //             await systemNotificationServices.systemNotification(
+    //                 body,
+    //                 title,
+    //                 admin.fcmToken,
+    //                 { clientId, planType, startDate, endDate }
+    //             );
+    //         }
+    //     }
+
+    //     return updatedClient;
+    // }
+
+    requestPlan: async (clientId, planType) => {
+
         const updateFields = {
-            [`${planType}PlanStatus`]: 'Requested',
-            [`${planType}PlanStatusStartDate`]: startDate,
-            [`${planType}PlanStatusEndDate`]: endDate
+            [`${planType}PlanStatus`]: 'Requested'
         };
 
         const updatedClient = await clientModel.findByIdAndUpdate(
@@ -126,7 +163,8 @@ const clientServices = {
         const clientName = client?.name || 'Unknown Client';
 
         const title = `${planType === 'workout' ? 'Workout' : 'Meal'} Plan Requested`;
-        const body = `Client ${clientName} has requested a ${planType} plan from ${startDate} to ${endDate}`;
+        const body = `Client ${clientName} has requested a ${planType} plan.`;
+
 
         for (const admin of activeAdmins) {
             if (admin.fcmToken) {
@@ -134,14 +172,13 @@ const clientServices = {
                     body,
                     title,
                     admin.fcmToken,
-                    { clientId, planType, startDate, endDate }
+                    { clientId, planType }
                 );
             }
         }
 
         return updatedClient;
     }
-
     ,
     getByEmail: async (email) => {
         const user = await clientModel

@@ -3,11 +3,15 @@ const Joi = require('joi');
 const bodyMetricsValidator = {
     create: (req, res, next) => {
         const schema = Joi.object({
-            clientId: Joi.string().hex().length(24).required(),  // ObjectId should be a 24-character hexadecimal string
+            clientId: Joi.string().hex().length(24).required(),
             weight: Joi.number().optional(),
             waist: Joi.number().optional(),
+            chest: Joi.number().optional(),
             hips: Joi.number().optional(),
             bodyFat: Joi.number().optional(),
+            restingHeartRate: Joi.number().optional(),
+            thigh: Joi.number().optional(),
+            arm: Joi.number().optional(),
             weightLoss: Joi.number().optional(),
             muscleGain: Joi.number().optional(),
             caloriesBurned: Joi.number().optional(),

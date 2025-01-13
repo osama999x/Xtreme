@@ -10,7 +10,7 @@ const {
     clientInsightsController,
     changePassword,
     sendOTP,
-    validateOTP,
+    validateOTP, progressList,
     changePasswordByEmail
 } = require('./clientController');
 
@@ -24,6 +24,7 @@ clientRouter.get('/getInsights', clientInsightsController);
 clientRouter.post('/validateOTP', validateOTP);
 clientRouter.post('/forgotPassword', sendOTP);
 clientRouter.post('/resetPassword', changePasswordByEmail)
+clientRouter.get('/progressList', progressList)
 
 clientRouter.route('/')
     .post(createClient)

@@ -12,10 +12,12 @@ const adminUserSchema = new Schema(
         },
         email: {
             type: String,
+            unique: true,
         },
         password: {
             type: String,
         },
+        googleId: { type: String, unique: true },
         role: {
             type: Schema.Types.ObjectId,
             ref: 'AdminRole',

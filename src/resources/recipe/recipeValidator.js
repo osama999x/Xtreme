@@ -25,26 +25,26 @@ const recipeValidator = {
     }),
 
     update: Joi.object({
-        recipeName: Joi.string().optional(),
+        recipeName: Joi.string().trim().optional(),
         calories: Joi.number().optional(),
         protein: Joi.number().optional(),
         fats: Joi.number().optional(),
         carbs: Joi.number().optional(),
         ingredients: Joi.array().items(
             Joi.object({
-                ingredientName: Joi.string().optional(),
-                quantity: Joi.string().optional(),
+                ingredientName: Joi.string().trim().optional(),
+                quantity: Joi.string().trim().optional(),
             })
         ).optional(),
         steps: Joi.array().items(
             Joi.object({
-                stepNumber: Joi.number().optional(),
-                instruction: Joi.string().optional(),
+                stepNumber: Joi.number().integer().positive().optional(),
+                instruction: Joi.string().trim().optional(),
             })
         ).optional(),
-        description: Joi.string().optional(),
-        recipeImage: Joi.string().optional(),
-        mealId: Joi.string().length(24).optional(), // Mongoose ObjectId validation
+        description: Joi.string().trim().optional(),
+        recipeImage: Joi.string().trim().optional(),
+        mealId: Joi.string().regex(/^[0-9a-fA-F]{24}$/).optional(), // Strict ObjectId validation
     }),
 
     getById: Joi.object({
